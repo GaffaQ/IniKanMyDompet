@@ -1,82 +1,239 @@
-# Arsitektur Sistem IniKanMyDompet - Versi Sederhana
+# Flow Alur Kerja Aplikasi IniKanMyDompet
 
-## Apa Itu Aplikasi Ini?
+## Flow Awal: User Pertama Kali Mengakses Website
 
-IniKanMyDompet adalah aplikasi **Budget & Expense Tracker** yang berjalan 100% di browser user. Tidak ada server atau database eksternal. Semua data disimpan di browser menggunakan LocalStorage, sehingga aplikasi bisa bekerja offline dan data tetap tersimpan meskipun user menutup browser.
+```
+User (Mobile/Desktop)
+  → Akses Website
+  → Browser memuat aplikasi React
+  → App.tsx dijalankan
+  → initializeDefaultCategories() → Buat 6 kategori default
+  → Simpan kategori ke LocalStorage
+  → DailyTipsModal muncul otomatis
+  → Dashboard dimuat
+  → useCategoryStore() → Load kategori dari LocalStorage (6 kategori)
+  → useTransactionStore() → Load transaksi dari LocalStorage (kosong)
+  → getStats() → Hitung statistik (semua 0)
+  → Dashboard menampilkan: "Belum ada transaksi"
+```
 
-## Bagaimana Aplikasi Bekerja?
+## Flow: User Menambah Transaksi Baru
 
-### Saat User Pertama Kali Membuka Website
+```
+User (Mobile/Desktop)
+  → Klik tombol "+" (FAB) di Dashboard
+  → TransactionModal terbuka
+  → User isi form: nama, jumlah, kategori, tipe, tanggal
+  → User klik "Simpan"
+  → Validasi input (nama minimal 2 karakter, jumlah > 0)
+  → Cek target menabung (jika expense dan saldo < target → warning)
+  → addTransaction() → transactionStore.addTransaction()
+  → Generate ID unik untuk transaksi
+  → Simpan transaksi ke LocalStorage
+  → Update React state
+  → Dashboard otomatis update: stats, charts, list transaksi
+  → Modal tertutup
+  → Toast notifikasi: "Transaksi berhasil ditambahkan"
+```
 
-Ketika user membuka website untuk pertama kali, aplikasi akan otomatis membuat 6 kategori default (Makanan, Transportasi, Belanja, Hiburan, Tagihan, Lainnya) dan menyimpannya di LocalStorage. Modal "Daily Tips" akan muncul otomatis untuk memberikan tips menabung. Dashboard akan menampilkan statistik kosong karena belum ada transaksi.
+## Flow: User Melihat Dashboard
 
-### Saat User Menambah Transaksi
+```
+User (Mobile/Desktop)
+  → Buka Dashboard
+  → useTransactionStore() → Load semua transaksi dari LocalStorage
+  → getStats() → calculateStats(transactions)
+  → Hitung: totalIncome, totalExpense, balance
+  → Hitung: expenseByCategory (untuk pie chart)
+  → Hitung: dailyExpenses (untuk line chart)
+  → Hitung: monthlyIncome/Expense (untuk bar chart)
+  → useSavingsTarget() → Load target dari LocalStorage
+  → calculateTarget(currentMonthIncome)
+  → Cek: balance < target? → Jika ya, tampilkan alert
+  → Render Dashboard dengan data real-time
+```
 
-Ketika user mengklik tombol tambah transaksi dan mengisi form (nama, jumlah, kategori, tanggal, dll), aplikasi akan memvalidasi data terlebih dahulu. Jika data valid, transaksi akan disimpan ke LocalStorage dengan ID unik. Setelah itu, semua komponen yang menggunakan data transaksi (dashboard, charts, list transaksi) akan otomatis update untuk menampilkan data terbaru. Jika user menambah pengeluaran yang menyebabkan saldo kurang dari target menabung, akan muncul peringatan di modal dan notifikasi toast.
+## Flow: User Filter & Search Transaksi
 
-### Saat User Melihat Dashboard
+```
+User (Mobile/Desktop)
+  → Buka halaman Transactions atau SearchFilter
+  → User input search query / pilih filter
+  → getFilteredTransactions(filter, sortOption)
+  → Filter by: search query (nama, catatan, kategori)
+  → Filter by: tipe (income/expense)
+  → Filter by: kategori
+  → Filter by: rentang tanggal
+  → Sort by: tanggal atau jumlah (asc/desc)
+  → Tampilkan hasil filter di UI
+  → Update real-time saat filter berubah
+```
 
-Dashboard akan membaca semua transaksi dari LocalStorage, kemudian menghitung statistik secara otomatis: total pemasukan (dari semua transaksi income), total pengeluaran (dari semua transaksi expense), dan sisa anggaran (pemasukan dikurangi pengeluaran). Data ini juga digunakan untuk membuat grafik: pie chart pengeluaran per kategori, line chart pengeluaran harian 7 hari terakhir, dan bar chart perbandingan pemasukan vs pengeluaran per bulan. Jika user sudah set target menabung, dashboard akan menampilkan target dan alert jika saldo kurang dari target.
+## Flow: User Set Target Menabung
 
-### Saat User Filter atau Search
+```
+User (Mobile/Desktop)
+  → Buka halaman Profile
+  → useSavingsTarget() → Load target dari LocalStorage
+  → User input persentase (contoh: 25%)
+  → User klik "Simpan Target"
+  → setSavingsTarget(25) → Validasi (0-100)
+  → Simpan ke LocalStorage
+  → Toast: "Target menabung berhasil disimpan"
+  → User kembali ke Dashboard
+  → calculateTarget(currentMonthIncome)
+  → Hitung: target = (income × 25) / 100
+  → Cek: balance < target? → Jika ya, tampilkan alert
+  → Info card menampilkan target & status
+```
 
-Ketika user menggunakan fitur filter atau search, aplikasi akan membaca semua transaksi dari state, kemudian memfilter berdasarkan kriteria yang dipilih (kata kunci, tipe transaksi, kategori, rentang tanggal). Hasil filter kemudian di-sort berdasarkan tanggal atau jumlah, dan ditampilkan di UI. Proses ini terjadi secara real-time tanpa perlu reload halaman.
+## Flow: User Menambah Pengeluaran yang Melewati Target
 
-### Saat User Set Target Menabung
+```
+User (Mobile/Desktop)
+  → Buka TransactionModal
+  → Pilih tipe: "expense"
+  → Input amount (contoh: 50000)
+  → useEffect() → Hitung: newBalance = currentBalance - amount
+  → Cek: newBalance < savingsTarget?
+  → Jika ya → setShowTargetWarning(true)
+  → Alert warning muncul di modal: "Target Menabung Akan Terlewat"
+  → User tetap klik "Simpan"
+  → handleSubmit() → Cek lagi target warning
+  → Toast warning: "Target menabung terlewat!"
+  → addTransaction() → Simpan transaksi
+  → Dashboard update dengan saldo baru
+```
 
-User bisa mengatur persentase target menabung di halaman Profile (misalnya 25%). Aplikasi akan menyimpan persentase ini ke LocalStorage. Ketika user kembali ke Dashboard, aplikasi akan menghitung target berdasarkan pemasukan bulan ini. Misalnya jika pemasukan bulan ini Rp 1.000.000 dan target 25%, maka target menabung adalah Rp 250.000. Jika saldo saat ini kurang dari target, akan muncul alert di dashboard. Saat user menambah pengeluaran yang menyebabkan saldo kurang dari target, akan muncul warning di modal transaksi.
+## Flow: User Edit Transaksi
 
-### Saat User Refresh Browser
+```
+User (Mobile/Desktop)
+  → Klik transaksi di list
+  → TransactionModal terbuka dengan data transaksi
+  → User edit data (nama, jumlah, kategori, dll)
+  → User klik "Simpan"
+  → Validasi input
+  → updateTransaction() → transactionStore.updateTransaction()
+  → Update transaksi di LocalStorage
+  → Update React state
+  → Dashboard otomatis update: stats, charts
+  → Modal tertutup
+  → Toast: "Transaksi berhasil diupdate"
+```
 
-Karena semua data disimpan di LocalStorage browser, ketika user refresh atau menutup lalu membuka kembali website, semua data (transaksi, kategori, target menabung) akan tetap ada dan dimuat otomatis. User tidak akan kehilangan data kecuali mereka menghapus data browser secara manual.
+## Flow: User Hapus Transaksi
 
-## Struktur Data di LocalStorage
+```
+User (Mobile/Desktop)
+  → Klik tombol hapus di transaksi
+  → Konfirmasi hapus
+  → deleteTransaction(id) → transactionStore.deleteTransaction()
+  → Hapus transaksi dari LocalStorage
+  → Update React state
+  → Dashboard otomatis update: stats, charts
+  → Toast: "Transaksi berhasil dihapus"
+```
 
-Aplikasi menyimpan 3 jenis data utama di LocalStorage:
+## Flow: User Refresh Browser
 
-1. **Transaksi** (key: `dompetku_transactions`): Array berisi semua transaksi yang pernah dibuat, dengan informasi seperti ID, nama, jumlah, tipe (income/expense), kategori, tanggal, dan catatan.
+```
+User (Mobile/Desktop)
+  → Refresh browser (F5 atau reload)
+  → Browser memuat aplikasi React lagi
+  → App.tsx dijalankan
+  → initializeDefaultCategories() → Cek kategori sudah ada? Skip
+  → Dashboard dimuat
+  → useCategoryStore() → Load kategori dari LocalStorage
+  → useTransactionStore() → Load transaksi dari LocalStorage
+  → useSavingsTarget() → Load target dari LocalStorage
+  → Semua data tetap ada (tidak hilang)
+  → Dashboard menampilkan data terakhir sebelum refresh
+```
 
-2. **Kategori** (key: `dompetku_categories`): Array berisi semua kategori transaksi, dengan informasi ID, nama, dan warna. Kategori default dibuat otomatis saat pertama kali aplikasi dibuka.
+## Flow: User Export Data
 
-3. **Target Menabung** (key: `dompetku_savingsTarget`): Object berisi persentase target menabung yang di-set user di halaman Profile.
+```
+User (Mobile/Desktop)
+  → Buka halaman Settings atau Backup
+  → Klik "Export Data"
+  → exportToJSON() → Load semua data dari LocalStorage
+  → Gabungkan: transactions + categories + savingsTarget
+  → Generate JSON file
+  → Download file ke device user
+  → File berisi semua data untuk backup
+```
 
-## Alur Data dalam Aplikasi
+## Flow: User Import Data
 
-Aplikasi menggunakan 4 layer utama yang bekerja secara berurutan:
+```
+User (Mobile/Desktop)
+  → Buka halaman Settings atau Backup
+  → Klik "Import Data"
+  → User pilih file JSON
+  → Baca file JSON
+  → Validasi struktur JSON
+  → Jika valid → importTransactions() + importCategories()
+  → Timpa data di LocalStorage dengan data baru
+  → Update React state
+  → Dashboard otomatis update dengan data baru
+  → Toast: "Data berhasil diimport"
+```
 
-**Layer 1 - UI Components**: Ini adalah halaman dan komponen yang user lihat dan gunakan. Ketika user melakukan aksi (klik tombol, isi form), layer ini akan memanggil fungsi dari layer berikutnya.
+## Flow: User Tambah Kategori Baru
 
-**Layer 2 - Custom Hooks**: Ini adalah React hooks yang mengelola state aplikasi. Hooks ini bertanggung jawab untuk menyinkronkan data antara React state (untuk re-render UI) dengan LocalStorage (untuk persistensi data). Setiap kali data berubah, hooks akan update state dan trigger re-render UI.
+```
+User (Mobile/Desktop)
+  → Buka halaman Categories
+  → Klik "Tambah Kategori"
+  → Form modal terbuka
+  → User input nama kategori (contoh: "Olahraga")
+  → User pilih warna
+  → User klik "Simpan"
+  → Validasi: nama minimal 2 karakter, tidak duplikat
+  → addCategory() → categoryStore.addCategory()
+  → Generate ID unik
+  → Simpan kategori ke LocalStorage
+  → Update React state
+  → Kategori muncul di list
+  → Kategori tersedia di dropdown transaksi
+```
 
-**Layer 3 - Business Logic**: Ini adalah fungsi-fungsi murni yang menangani logika bisnis aplikasi, seperti validasi data, perhitungan statistik, filter dan sorting. Layer ini tidak bergantung pada React, sehingga bisa digunakan di mana saja dan mudah di-test.
+## Flow: User Hapus Kategori
 
-**Layer 4 - Storage**: Ini adalah wrapper untuk LocalStorage yang menangani penyimpanan dan pembacaan data dengan error handling yang aman. Layer ini memastikan data tersimpan dengan benar dan menangani error jika LocalStorage penuh atau diblokir.
+```
+User (Mobile/Desktop)
+  → Buka halaman Categories
+  → Klik tombol hapus di kategori
+  → Validasi: kategori "Lainnya" tidak bisa dihapus
+  → Cek: ada transaksi yang pakai kategori ini?
+  → Jika ada → Reassign semua transaksi ke kategori "Lainnya"
+  → deleteCategory(id) → categoryStore.deleteCategory()
+  → Hapus kategori dari LocalStorage
+  → Update transaksi yang pakai kategori ini
+  → Update React state
+  → Kategori hilang dari list
+  → Toast: "Kategori berhasil dihapus"
+```
 
-## Contoh Alur Lengkap: Menambah Transaksi
+## Ringkasan: Alur Data dalam Aplikasi
 
-1. User mengklik tombol tambah transaksi di dashboard
-2. Modal transaksi terbuka dengan form kosong
-3. User mengisi form: nama "Makan Siang", jumlah 35000, kategori "Makanan", tipe "expense"
-4. User klik "Simpan"
-5. UI component memanggil `addTransaction()` dari hook `useTransactionStore`
-6. Hook memanggil `transactionStore.addTransaction()` untuk validasi dan penyimpanan
-7. Business logic memvalidasi data: nama minimal 2 karakter, jumlah > 0, kategori valid
-8. Jika valid, data disimpan ke LocalStorage melalui `localStorageClient.save()`
-9. Hook update React state dengan transaksi baru
-10. UI otomatis re-render: dashboard update stats, charts update, list transaksi update
-11. Modal tertutup dan toast notifikasi muncul: "Transaksi berhasil ditambahkan"
+```
+User Action
+  → UI Component (Page/Modal)
+  → Custom Hook (useTransactionStore/useCategoryStore)
+  → Business Logic (transactionStore/categoryStore)
+  → Storage Layer (localStorageClient)
+  → Browser LocalStorage
+  → Data tersimpan
+  → Hook update React state
+  → UI re-render dengan data baru
+```
 
-## Keunggulan Arsitektur Ini
+## Data yang Disimpan di LocalStorage
 
-Arsitektur ini dirancang untuk aplikasi client-side yang sederhana namun powerful. Keunggulannya adalah:
+1. **dompetku_transactions** → Array semua transaksi
+2. **dompetku_categories** → Array semua kategori
+3. **dompetku_savingsTarget** → Object target menabung
 
-- **Tidak perlu backend**: Semua logika dan data ada di browser, tidak perlu server atau database
-- **Cepat**: Tidak ada delay network karena semua data lokal
-- **Offline**: Aplikasi bisa bekerja tanpa internet
-- **Mudah di-maintain**: Logic terpisah dari UI, sehingga mudah diubah dan di-test
-- **Type-safe**: Menggunakan TypeScript untuk mencegah error dan memudahkan development
-
-## Kesimpulan
-
-Aplikasi IniKanMyDompet bekerja dengan cara yang sederhana: semua data disimpan di browser user menggunakan LocalStorage. Ketika user melakukan aksi (tambah, edit, hapus transaksi), data langsung disimpan ke LocalStorage dan UI otomatis update. Ketika user membuka kembali website, data dimuat dari LocalStorage dan ditampilkan. Semua perhitungan statistik dan grafik dilakukan secara real-time berdasarkan data transaksi yang ada. Sistem ini memastikan data user tetap aman dan tersimpan di browser mereka sendiri.
-
+Semua data ini tetap ada meskipun user refresh browser atau tutup tab.
