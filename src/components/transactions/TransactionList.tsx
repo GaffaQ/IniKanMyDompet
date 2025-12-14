@@ -50,7 +50,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
           Transaksi Terbaru
         </h3>
         <a
-          href="/transactions"
+          href="https://inikanmydompet.vercel.app/transactions"
           className="text-sm text-primary hover:underline font-medium"
         >
           Lihat Semua
